@@ -136,7 +136,6 @@ def zeta_partials_x_and_y(ex,ey):
     zeta_px = np.zeros(3)           # Partial derivative with respect to x
     zeta_py = np.zeros(3)           # Partial derivative with respect to y
 
-    # TODO: fill out missing parts (or reformulate completely)
     for i in range(3):
         j = cyclic_ijk[i+1]
         k = cyclic_ijk[i+2]
@@ -215,7 +214,6 @@ def tri6_Bmatrix(zeta,ex,ey):
         Bmatrix[2,c  ] = ny[i]
         Bmatrix[2,c+1] = nx[i]
 
-    # TODO: fill out missing parts (or reformulate completely)
 
     return Bmatrix
 

@@ -45,7 +45,6 @@ def quad4_shapefuncs(xsi, eta):
     Calculates shape functions evaluated at xi, eta
     """
     # ----- Shape functions -----
-    # TODO: fill inn values of the  shape functions
     N = np.zeros(4)
     for i in range(4):
         xsi_factor = 1
@@ -62,7 +61,6 @@ def quad4_shapefuncs_grad_xsi(xsi, eta):
     Calculates derivatives of shape functions wrt. xsi
     """
     # ----- Derivatives of shape functions with respect to xsi -----
-    # TODO: fill inn values of the  shape functions gradients with respect to xsi
     Ndxi = np.zeros(4)
     for i in range(4):
         xsi_factor = 1
@@ -81,7 +79,7 @@ def quad4_shapefuncs_grad_eta(xsi, eta):
     Calculates derivatives of shape functions wrt. eta
     """
     # ----- Derivatives of shape functions with respect to eta -----
-    # TODO: fill inn values of the  shape functions gradients with respect to xsi
+    
     Ndeta = np.zeros(4)
     for i in range(4):
         eta_factor = 1
@@ -142,8 +140,8 @@ def quad4_Kmatrix(ex, ey, D, thickness, eq=None):
             H = np.array([ex, ey])    # Collect global x- and y coordinates in one matrix
             G = np.array([Ndxsi, Ndeta])  # Collect gradients of shape function evaluated at xi and eta
 
-            #TODO: Calculate Jacobian, inverse Jacobian and determinant of the Jacobian
-            J = H@G.T #TODO: Correct this
+            
+            J = H@G.T          # Jacobian matrix
             invJ = np.linalg.inv(J)  # Inverse of Jacobian
             detJ = np.linalg.det(J)  # Determinant of Jacobian
 
@@ -153,7 +151,7 @@ def quad4_Kmatrix(ex, ey, D, thickness, eq=None):
 
             # Strain displacement matrix calculated at position xsi, eta
 
-            #TODO: Fill out correct values for strain displacement matrix at current xsi and eta
+            
             B  = np.zeros((3,8))
             for i in range(0,8,2):
                 B[0,i]   = dNdx[i//2]
@@ -161,7 +159,7 @@ def quad4_Kmatrix(ex, ey, D, thickness, eq=None):
                 B[2,i]   = dNdy[i//2]
                 B[2,i+1] = dNdx[i//2]
 
-            #TODO: Fill out correct values for displacement interpolation xsi and eta
+            
             N2 = np.zeros((2,8))
             for i in range(0,8,2):
                 N2[0,i]   = N1[i//2]
@@ -171,7 +169,7 @@ def quad4_Kmatrix(ex, ey, D, thickness, eq=None):
             Ke += (B.T) @ D @ B * detJ * t * gw[iGauss] * gw[jGauss]
             fe += (N2.T) @ f    * detJ * t * gw[iGauss] * gw[jGauss]
 
-    # TODO: remove this
+    
     #Ke = np.eye(8) * 1.0e6
 
     return Ke, fe  # Returns stiffness matrix and nodal force vector
@@ -197,7 +195,7 @@ def quad4_cornerstresses(ex, ey, D, th, elDispVec):
     cornerStresses = []
 
     for xsi, eta in xi_eta_corner:
-        # TODO: Compute the corerect corner stresses here
+
         Ndxsi = quad4_shapefuncs_grad_xsi(xsi, eta)
         Ndeta = quad4_shapefuncs_grad_eta(xsi, eta)
         H = np.array([ex, ey])    # Collect global x- and y coordinates in one matrix
