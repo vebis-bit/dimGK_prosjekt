@@ -128,11 +128,8 @@ def zeta_partials_x_and_y(ex,ey):
     :param list ey: element y coordinates [y1, y2, y3]
     """
     
-    tmp = np.array([[1,ex[0],ey[0]],
-                    [1,ex[1],ey[1]],
-                    [1,ex[2],ey[2]]])
-    
-    A2 = np.linalg.det(tmp)  # Double of triangle area
+    A = tri3_area(ex, ey)
+    A2 = 2.0 * A
        
     cyclic_ijk = [0,1,2,0,1]      # Cyclic permutation of the nodes i,j,k
     
@@ -162,28 +159,46 @@ def tri6_area(ex,ey):
 
 
 def tri6_shape_functions(zeta):
-    
-    cyclic_ijk = [0,1,2,0,1]      # Cyclic permutation of the nodes i,j,k
-
-    N6 = np.zeros(6)
-
-    # TODO: fill out missing parts (or reformulate completely)
-    for i in range(3):
-        N6[i] = 
-
-    return N6
+    L1, L2, L3 = zeta
+    return np.array([
+        L1*(2*L1 - 1),       # N1 (hjørne 1)
+        L2*(2*L2 - 1),       # N2 (hjørne 2)
+        L3*(2*L3 - 1),       # N3 (hjørne 3)
+        4*L1*L2,             # N4 (kant 1–2)
+        4*L2*L3,             # N5 (kant 2–3)
+        4*L3*L1              # N6 (kant 3–1)
+    ])
 
 
 def tri6_shape_function_partials_x_and_y(zeta,ex,ey):
-    
-    zeta_px, zeta_py = zeta_partials_x_and_y(ex,ey)
-    
+    L1, L2, L3 = zeta
+    zeta_px, zeta_py = zeta_partials_x_and_y(ex, ey)  # dL1/dx, dL2/dx, dL3/dx osv.
+
+    dL1dx, dL2dx, dL3dx = zeta_px
+    dL1dy, dL2dy, dL3dy = zeta_py
+
     N6_px = np.zeros(6)
     N6_py = np.zeros(6)
-    
-    cyclic_ijk = [0,1,2,0,1]      # Cyclic permutation of the nodes i,j,k
 
-    # TODO: fill out missing parts (or reformulate completely)
+    # Hjørner
+    N6_px[0] = (4*L1 - 1) * dL1dx
+    N6_py[0] = (4*L1 - 1) * dL1dy
+
+    N6_px[1] = (4*L2 - 1) * dL2dx
+    N6_py[1] = (4*L2 - 1) * dL2dy
+
+    N6_px[2] = (4*L3 - 1) * dL3dx
+    N6_py[2] = (4*L3 - 1) * dL3dy
+
+    # Kantmidter
+    N6_px[3] = 4 * (L1 * dL2dx + L2 * dL1dx)
+    N6_py[3] = 4 * (L1 * dL2dy + L2 * dL1dy)
+
+    N6_px[4] = 4 * (L2 * dL3dx + L3 * dL2dx)
+    N6_py[4] = 4 * (L2 * dL3dy + L3 * dL2dy)
+
+    N6_px[5] = 4 * (L3 * dL1dx + L1 * dL3dx)
+    N6_py[5] = 4 * (L3 * dL1dy + L1 * dL3dy)
 
     return N6_px, N6_py
 
@@ -193,6 +208,12 @@ def tri6_Bmatrix(zeta,ex,ey):
     nx,ny = tri6_shape_function_partials_x_and_y(zeta, ex, ey)
 
     Bmatrix = np.zeros((3,12))
+    for i in range(6):
+        c = 2*i
+        Bmatrix[0,c  ] = nx[i]
+        Bmatrix[1,c+1] = ny[i]
+        Bmatrix[2,c  ] = ny[i]
+        Bmatrix[2,c+1] = nx[i]
 
     # TODO: fill out missing parts (or reformulate completely)
 
@@ -221,18 +242,25 @@ def tri6_Kmatrix(ex,ey,D,th,eq=None):
     A    = tri6_area(ex,ey)
 
     Ke = np.zeros((12,12))
+    fe = np.zeros((12,1))
 
-    # TODO: fill out missing parts (or reformulate completely)
+    body_force = None if eq is None else np.array(eq, dtype=float).reshape(2,1)
 
-    # TODO: remove this
-    Ke = np.eye(12) * 1.0e6
+    for i_gp, zeta in enumerate(zetaInt):
+        weight = wInt[i_gp] * A * th
 
-    if eq is None:
-        fe = np.zeros((12,1))
-    else:
-        fe = np.zeros((12,1))
+        B = tri6_Bmatrix(zeta, ex, ey)
+        Ke += B.T @ D @ B * weight
 
-        # TODO: fill out missing parts (or reformulate completely)
+        if body_force is not None:
+            Nvals = tri6_shape_functions(zeta)
+            Nmat = np.zeros((2,12))
+            for i_node, Ni in enumerate(Nvals):
+                col = 2 * i_node
+                Nmat[0, col] = Ni
+                Nmat[1, col + 1] = Ni
+
+            fe += Nmat.T @ body_force * weight
 
     return Ke, fe
 
@@ -248,16 +276,18 @@ def tri6_cornerstresses(ex, ey, D, th, elDispVec):
     :param list th: element thickness
     :return list of list of corner stresses
     """
-
+    
     # Corner values
     zetaCorner = np.array([[1.0, 0.0, 0.0],
                            [0.0, 1.0, 0.0],
                            [0.0, 0.0, 1.0]])
 
     cornerStresses = []
-    for i in range(3):
-        # TODO: Compute the correct corner stresses here
-        cornerStresses.append([(i+1)*1.0,(i+2)*1.0,(i+3)*1.0])
+    for zeta in zetaCorner:
+        B = tri6_Bmatrix(zeta, ex, ey)
+        strain = B @ elDispVec
+        stress = D @ strain
+        cornerStresses.append(stress.flatten().tolist())
 
     return cornerStresses
 

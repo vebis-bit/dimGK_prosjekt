@@ -53,7 +53,8 @@ print("Displacement center node right end,  x:{:12.3e}   y:{:12.3e}".format(xC, 
 # Sum uf reaction forces
 R0Sum = np.zeros(2,'f')
 ndofs = len(R0)
-for i in range(ndofs,2):
+#for i in range(ndofs,2):
+for i in range(0,numNodesY*2,2):
     R0Sum[0] += R0[i  ,0]
     R0Sum[1] += R0[i+1,0]
 print("Total reaction force: x:{:12.3e} y:{:12.3e})".format(R0Sum[0],R0Sum[1]))

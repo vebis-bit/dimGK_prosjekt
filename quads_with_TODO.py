@@ -47,6 +47,14 @@ def quad4_shapefuncs(xsi, eta):
     # ----- Shape functions -----
     # TODO: fill inn values of the  shape functions
     N = np.zeros(4)
+    for i in range(4):
+        xsi_factor = 1
+        eta_factor = 1
+        if i == 1 or i == 2:
+            eta_factor = -1
+        if i == 2 or i == 3:
+            xsi_factor = -1
+        N[i] = 1/4*(1+xsi*xsi_factor)*(1+eta*eta_factor)
     return N
 
 def quad4_shapefuncs_grad_xsi(xsi, eta):
@@ -55,8 +63,16 @@ def quad4_shapefuncs_grad_xsi(xsi, eta):
     """
     # ----- Derivatives of shape functions with respect to xsi -----
     # TODO: fill inn values of the  shape functions gradients with respect to xsi
-
     Ndxi = np.zeros(4)
+    for i in range(4):
+        xsi_factor = 1
+        factor = 1
+        if i == 0 or i == 1:
+            xsi_factor = -1
+        if i == 0 or i == 3:
+            factor = -1
+        Ndxi[i] = factor*1/4*(1 + xsi*xsi_factor)
+
     return Ndxi
 
 
@@ -67,6 +83,14 @@ def quad4_shapefuncs_grad_eta(xsi, eta):
     # ----- Derivatives of shape functions with respect to eta -----
     # TODO: fill inn values of the  shape functions gradients with respect to xsi
     Ndeta = np.zeros(4)
+    for i in range(4):
+        eta_factor = 1
+        factor = 1
+        if i == 0 or i == 3:
+            eta_factor = -1
+        if i == 0 or i == 1:
+            factor = -1
+        Ndeta[i] = factor*1/4*(1 + eta*eta_factor)
     return Ndeta
 
 
@@ -115,11 +139,11 @@ def quad4_Kmatrix(ex, ey, D, thickness, eq=None):
             N1    = quad4_shapefuncs(xsi, eta)  # Collect shape functions evaluated at xi and eta
 
             # Matrix H and G defined according to page 52 of Waløens notes
-            H = np.transpose([ex, ey])    # Collect global x- and y coordinates in one matrix
+            H = np.array([ex, ey])    # Collect global x- and y coordinates in one matrix
             G = np.array([Ndxsi, Ndeta])  # Collect gradients of shape function evaluated at xi and eta
 
             #TODO: Calculate Jacobian, inverse Jacobian and determinant of the Jacobian
-            J = np.eye(2) #TODO: Correct this
+            J = H@G.T #TODO: Correct this
             invJ = np.linalg.inv(J)  # Inverse of Jacobian
             detJ = np.linalg.det(J)  # Determinant of Jacobian
 
@@ -131,16 +155,24 @@ def quad4_Kmatrix(ex, ey, D, thickness, eq=None):
 
             #TODO: Fill out correct values for strain displacement matrix at current xsi and eta
             B  = np.zeros((3,8))
+            for i in range(0,8,2):
+                B[0,i]   = dNdx[i//2]
+                B[1,i+1] = dNdy[i//2]
+                B[2,i]   = dNdy[i//2]
+                B[2,i+1] = dNdx[i//2]
 
             #TODO: Fill out correct values for displacement interpolation xsi and eta
             N2 = np.zeros((2,8))
+            for i in range(0,8,2):
+                N2[0,i]   = N1[i//2]
+                N2[1,i+1] = N1[i//2]
 
             # Evaluates integrand at current integration points and adds to final solution
             Ke += (B.T) @ D @ B * detJ * t * gw[iGauss] * gw[jGauss]
             fe += (N2.T) @ f    * detJ * t * gw[iGauss] * gw[jGauss]
 
     # TODO: remove this
-    Ke = np.eye(8) * 1.0e6
+    #Ke = np.eye(8) * 1.0e6
 
     return Ke, fe  # Returns stiffness matrix and nodal force vector
 
@@ -161,15 +193,69 @@ def quad4_cornerstresses(ex, ey, D, th, elDispVec):
                            [-1.0, 1.0],
                            [-1.0, -1.0],
                            [1.0, -1.0]])
-
+    
     cornerStresses = []
 
-    for i in range(4):
+    for xsi, eta in xi_eta_corner:
         # TODO: Compute the corerect corner stresses here
-        cornerStresses.append([(i+1)*1.0,(i+2)*1.0,(i+3)*1.0])
+        Ndxsi = quad4_shapefuncs_grad_xsi(xsi, eta)
+        Ndeta = quad4_shapefuncs_grad_eta(xsi, eta)
+        H = np.array([ex, ey])    # Collect global x- and y coordinates in one matrix
+        G = np.array([Ndxsi, Ndeta])  # Collect gradients of shape function evaluated at xi and eta
+        J = H@G.T
+        invJ = np.linalg.inv(J)  # Inverse of Jacobian
+        dN = invJ @ G  # Derivatives of shape functions with respect to x and y
+        dNdx, dNdy = dN[0], dN[1]
+        B  = np.zeros((3,8))
+        for i in range(0,8,2):
+            B[0,i]   = dNdx[i//2]
+            B[1,i+1] = dNdy[i//2]
+            B[2,i]   = dNdy[i//2]
+            B[2,i+1] = dNdx[i//2]
+        eps = B @ elDispVec  # Strain at corner points
+        sigma = D @ eps      # Stress at corner points
+        cornerStresses.append(sigma.flatten().tolist())
 
     return cornerStresses
 
+def shape_funcs_and_grads(xsi, eta):
+        """Quadratic 9-node Lagrange shape functions and natural gradients."""
+        N1 = 0.25*xsi*eta*(xsi-1)*(eta-1)
+        N2 = 0.25*xsi*eta*(xsi+1)*(eta-1)
+        N3 = 0.25*xsi*eta*(xsi+1)*(eta+1)
+        N4 = 0.25*xsi*eta*(xsi-1)*(eta+1)
+        N5 = 0.5*(1 - xsi**2)*eta*(eta-1)
+        N6 = 0.5*xsi*(xsi+1)*(1 - eta**2)
+        N7 = 0.5*(1 - xsi**2)*eta*(eta+1)
+        N8 = 0.5*xsi*(xsi-1)*(1 - eta**2)
+        N9 = (1 - xsi**2)*(1 - eta**2)
+
+        dNdxi = np.array([
+            0.25*eta*(2*xsi-1)*(eta-1),
+            0.25*eta*(2*xsi+1)*(eta-1),
+            0.25*eta*(2*xsi+1)*(eta+1),
+            0.25*eta*(2*xsi-1)*(eta+1),
+           -xsi*eta*(eta-1),
+            0.5*(2*xsi+1)*(1 - eta**2),
+           -xsi*eta*(eta+1),
+            0.5*(2*xsi-1)*(1 - eta**2),
+           -2*xsi*(1 - eta**2)
+        ])
+
+        dNdeta = np.array([
+            0.25*xsi*(xsi-1)*(2*eta-1),
+            0.25*xsi*(xsi+1)*(2*eta-1),
+            0.25*xsi*(xsi+1)*(2*eta+1),
+            0.25*xsi*(xsi-1)*(2*eta+1),
+            0.5*(1 - xsi**2)*(2*eta-1),
+           -eta*xsi*(xsi+1),
+            0.5*(1 - xsi**2)*(2*eta+1),
+           -eta*xsi*(xsi-1),
+           -2*eta*(1 - xsi**2)
+        ])
+
+        N = np.array([N1, N2, N3, N4, N5, N6, N7, N8, N9])
+        return N, dNdxi, dNdeta
 
 def quad9_Kmatrix(ex,ey,D,th,eq=None):
     """
@@ -184,16 +270,50 @@ def quad9_Kmatrix(ex,ey,D,th,eq=None):
     :return mat fe: consistent load vector [6 x 1] (if eq!=None)
     """
 
-    Ke = np.eye(18) * 1.0e6
+    t = th
+    f = np.zeros((2,1)) if eq is None else np.array(eq, dtype=float).reshape(2,1)
+
+    Ke = np.zeros((18,18))
     fe = np.zeros((18,1))
 
-    # TODO: fill out missing parts (or reformulate completely)
-
-    if eq is None:
-        fe = np.zeros((18,1))
-    else:
-        fe = np.zeros((18,1))
     
+
+    gp, gw = gauss_points(3)
+
+    for iGauss, xsi in enumerate(gp):
+        for jGauss, eta in enumerate(gp):
+            wx = gw[iGauss]
+            wy = gw[jGauss]
+
+            N, dNdxi, dNdeta = shape_funcs_and_grads(xsi, eta)
+
+            H = np.array([ex, ey])        # 2 x 9
+            G = np.array([dNdxi, dNdeta]) # 2 x 9
+            J = H @ G.T                   # 2 x 2
+            invJ = np.linalg.inv(J)
+            detJ = np.linalg.det(J)
+
+            dN = invJ @ G                 # 2 x 9 -> global gradients
+            dNdx, dNdy = dN[0], dN[1]
+
+            B = np.zeros((3,18))
+            for a in range(9):
+                col = 2*a
+                B[0, col]   = dNdx[a]
+                B[1, col+1] = dNdy[a]
+                B[2, col]   = dNdy[a]
+                B[2, col+1] = dNdx[a]
+
+            N2 = np.zeros((2,18))
+            for a in range(9):
+                col = 2*a
+                N2[0, col]   = N[a]
+                N2[1, col+1] = N[a]
+
+            weight = detJ * t * wx * wy
+            Ke += B.T @ D @ B * weight
+            fe += N2.T @ f * weight
+
     return Ke, fe
 
 
@@ -217,9 +337,24 @@ def quad9_cornerstresses(ex, ey, D, th, elDispVec):
 
     cornerStresses = []
 
-    for i in range(4):
-        # TODO: Compute the correct corner stresses here
-        cornerStresses.append([(i+1)*1.0,(i+2)*1.0,(i+3)*1.0])
+    for xsi, eta in xi_eta_corner:
+        N, dNdxi, dNdeta = shape_funcs_and_grads(xsi, eta)
+        H = np.array([ex, ey])    # Collect global x- and y coordinates in one matrix
+        G = np.array([dNdxi, dNdeta])  # Collect gradients of shape function evaluated at xi and eta
+        J = H@G.T
+        invJ = np.linalg.inv(J)  # Inverse of Jacobian
+        dN = invJ @ G  # Derivatives of shape functions with respect to x and y
+        dNdx, dNdy = dN[0], dN[1]
+        B  = np.zeros((3,18))
+        for i in range(9):
+            c = 2*i
+            B[0,c]   = dNdx[i]
+            B[1,c+1] = dNdy[i]
+            B[2,c]   = dNdy[i]
+            B[2,c+1] = dNdx[i]
+        eps = B @ elDispVec  # Strain at corner points
+        sigma = D @ eps      # Stress at corner points
+        cornerStresses.append(sigma.flatten().tolist())
 
     return cornerStresses
   
